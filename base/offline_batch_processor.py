@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
+from openai import OpenAI
 
 class OfflineBatchProcessor(ABC):
     def __init__(
         self,
         *,
-        client: Any,
+        client: OpenAI,
         handlers: Optional[List[Any]] = None,
         state_dir: Path = Path(".batch_jobs"),
     ):
