@@ -1,7 +1,8 @@
 import numpy as np
 from enum import Enum
+from typing import Any, List, Optional
 from ..base import BaseCategorizer
-from typing import Any
+from ..handlers import ResultHandler
 
 class EmbeddingCategorizer(BaseCategorizer):
     """
@@ -11,13 +12,14 @@ class EmbeddingCategorizer(BaseCategorizer):
     def __init__(
         self,
         categories: Enum,
-        embedding_model: Any
+        embedding_model: Any,
+        handlers: Optional[List[ResultHandler]] = None
     ):
         """
         :param categories: your Enum class, whose members have `.embeddings`
         :param embedding_model: something with `.encode(text: str) -> List[float]`
         """
-        super().__init__(categories)
+        super().__init__(categories, handlers)
         self.embedding_model = embedding_model
 
     def categorize(self, text: str) -> Enum:
@@ -38,6 +40,8 @@ class EmbeddingCategorizer(BaseCategorizer):
                     best_score = score
                     best_cat = cat
 
+
+        self._dispatch({text: best_cat})
         return best_cat
 
     @staticmethod
