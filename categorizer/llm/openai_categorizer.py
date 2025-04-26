@@ -2,8 +2,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, create_model
 from openai import OpenAI
-from ..base import BaseCategorizer
-from ..handlers import NoOpResultHandler
+from base import BaseCategorizer
+from handlers import NoOpResultHandler
 
 class LLMCategorizer(BaseCategorizer):
     """

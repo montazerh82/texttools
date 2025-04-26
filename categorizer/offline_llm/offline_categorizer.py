@@ -6,8 +6,8 @@ from enum import Enum
 
 from openai import OpenAI
 from pydantic import create_model
-from ..base import BaseCategorizer
-from ..handlers import NoOpResultHandler
+from base import BaseCategorizer
+from handlers import NoOpResultHandler
 
 class OfflineCategorizer(BaseCategorizer):
     """
