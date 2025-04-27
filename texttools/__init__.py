@@ -1,9 +1,9 @@
-from texttools.question_detector.llm import LLMQuestionDetector
+from texttools.question_detector.llm_detector import LLMQuestionDetector
 from handlers.handlers import NoOpResultHandler, PrintResultHandler, ResultHandler, SaveToFileResultHandler
 from texttools import EmbeddingCategorizer
 from categorizer.llm.openai_categorizer import LLMCategorizer
-from texttools import OfflineCategorizer
-
+from texttools.categorizer.offline_llm.offline_categorizer import OfflineCategorizer
+from texttools.question_detector.offline_llm_detector import OfflineQuestionDetector
 __all__ = [
     "LLMQuestionDetector",
     "NoOpResultHandler",
@@ -12,5 +12,6 @@ __all__ = [
     "SaveToFileResultHandler",
     "EmbeddingCategorizer",
     "LLMCategorizer",
-    "OfflineCategorizer"
+    "OfflineCategorizer",
+    "OfflineQuestionDetector"
     ]

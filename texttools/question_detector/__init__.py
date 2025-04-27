@@ -1,1 +1,2 @@
-from llm import LLMQuestionDetector
+from texttools.question_detector.llm_detector import LLMQuestionDetector
+from texttools.question_detector.offline_llm_detector import OfflineQuestionDetector
