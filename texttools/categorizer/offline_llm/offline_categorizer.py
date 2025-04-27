@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from enum import Enum
 from typing import List, Any, Tuple, Dict
-from base import OfflineBatchProcessor
+from texttools.base import OfflineBatchProcessor
 
 from openai import OpenAI
 

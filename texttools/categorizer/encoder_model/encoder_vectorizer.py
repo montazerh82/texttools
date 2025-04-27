@@ -1,7 +1,7 @@
 import numpy as np
 from enum import Enum
 from typing import Any, List, Optional
-from base import BaseCategorizer
+from texttools.base import BaseCategorizer
 from handlers import ResultHandler
 
 class EmbeddingCategorizer(BaseCategorizer):

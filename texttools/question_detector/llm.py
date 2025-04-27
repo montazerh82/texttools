@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 from pydantic import BaseModel, create_model
 from openai import OpenAI
-from base import BaseQuestionDetector
+from texttools.base import BaseQuestionDetector
 
 class LLMQuestionDetector(BaseQuestionDetector):
     """
