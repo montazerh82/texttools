@@ -1,1 +1,1 @@
-from offline_categorizer import OfflineCategorizer
+from .offline_categorizer import OfflineCategorizer

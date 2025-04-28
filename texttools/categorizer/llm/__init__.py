@@ -1,1 +1,1 @@
-from openai_categorizer import LLMCategorizer
+from .openai_categorizer import LLMCategorizer
