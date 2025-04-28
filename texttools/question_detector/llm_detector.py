@@ -106,7 +106,7 @@ class LLMQuestionDetector(BaseQuestionDetector):
         )
         output: BaseModel = resp.output_parsed
         self._dispatch({
-            "input": text,             
+            "question": text,             
             "result":   output.result     
         })
         return output.result
