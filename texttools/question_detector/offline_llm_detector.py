@@ -1,12 +1,12 @@
 import json
 import uuid
 import time
-from pydantic import create_model
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 from openai import OpenAI
-from texttools.base.base_question_detector import BaseQuestionDetector
+from pydantic import create_model
 from texttools.base import OfflineBatchProcessor
+from typing import Any, Dict, List, Optional, Tuple
+from texttools.base.base_question_detector import BaseQuestionDetector
 
 
 class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
@@ -65,7 +65,7 @@ class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
             "body": {
                 "model": self.model,
                 "temperature": self.temperature,
-                "response_format": self._OutputModel,
+                "response_format": self._OutputModel.model_json_schema(),
                 "messages": [
                     {"role": "system", "content": self.prompt_template},
                     {"role": "user", "content": clean}

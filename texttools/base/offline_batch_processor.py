@@ -106,7 +106,12 @@ class OfflineBatchProcessor(ABC):
         Fetches the results after batch is ready.
         Dispatches to handlers and clears state.
         """
+        if not self._jobs and self._state_file and self._state_file.exists():
+                print(f"Reloading jobs from {self._state_file}")
+                with open(self._state_file, "r", encoding="utf-8") as f:
+                    self._jobs = json.load(f)
         if not self._jobs:
+            print("No batch jobs found.")
             return {}
 
         results = {}
