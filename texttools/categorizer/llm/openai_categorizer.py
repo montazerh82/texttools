@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, create_model
 from openai import OpenAI
 from texttools.base import BaseCategorizer
-from handlers import NoOpResultHandler
+from texttools.handlers import NoOpResultHandler
 
 class LLMCategorizer(BaseCategorizer):
     """
