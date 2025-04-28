@@ -105,5 +105,8 @@ class LLMQuestionDetector(BaseQuestionDetector):
             **self.client_kwargs,
         )
         output: BaseModel = resp.output_parsed
-        self._dispatch({"text": output.result})  
+        self._dispatch({
+            "input": text,             
+            "result":   output.result     
+        })
         return output.result
