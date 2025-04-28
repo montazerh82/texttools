@@ -5,7 +5,7 @@ import logging
 from typing import Dict, List, Optional
 from abc import ABC, abstractmethod
 from enum import Enum
-from handlers import ResultHandler, NoOpResultHandler
+from texttools.handlers import ResultHandler, NoOpResultHandler
 
 class BaseCategorizer(ABC):
     def __init__(
