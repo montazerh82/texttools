@@ -58,11 +58,12 @@ class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
 
     def _build_task(self, text: str, idx: int) -> Dict[str, Any]:
         clean = self.preprocess(text)
-        schema = self._OutputModel.model_json_schema()  
+
+        schema = self._OutputModel.model_json_schema()
         response_fmt = {
             "type": "json_schema",
-            "json_schema": schema ,
-            "strict": True
+            "json_schema": schema,
+            "strict": True,
         }
 
         return {
@@ -71,20 +72,26 @@ class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
             "url": "/v1/chat/completions",
             "body": {
                 "model": self.model,
-                "prompt": clean,
+                # <-- this is mandatory for chat endpoints:
+                "messages": [
+                    {"role": "system", "content": self.prompt_template},
+                    {"role": "user",   "content": clean},
+                ],
+                # give me structured (schema-validated) JSON back:
                 "response_format": response_fmt,
-                **self.client_kwargs
+                **self.client_kwargs,
             }
         }
 
-
     def _prepare_upload_file(self, payload: List[str]) -> Path:
         tasks = [self._build_task(text, i) for i, text in enumerate(payload)]
-        file_id = uuid.uuid4().hex
+        file_id   = uuid.uuid4().hex
         file_path = self.state_dir / f"batch_questions_{file_id}.jsonl"
+
         with open(file_path, "w", encoding="utf-8") as f:
             for task in tasks:
                 f.write(json.dumps(task) + "\n")
+
         return file_path
 
     def _submit_batch(self, file_path: Path) -> str:

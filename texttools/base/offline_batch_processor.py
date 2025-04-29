@@ -110,9 +110,10 @@ class OfflineBatchProcessor(ABC):
 
     def fetch_results(self, job_name: str) -> Dict[str, Any]:
         """
-        Loads the saved batch metadata, refreshes status,
-        stores any new file_ids back to disk, and finally
-        downloads results/errors.
+        Loads saved batch metadata, checks status, then downloads:
+          - successes into `results`
+          - failures into `errors`
+        Always persists any newly discovered file IDs back to disk.
         """
         jobs = self._load_state(job_name)
         if not jobs:
@@ -120,54 +121,67 @@ class OfflineBatchProcessor(ABC):
             return {}
 
         all_results = {}
-        all_errors = {}
-        updated = False
+        updated     = False
 
         for job in jobs:
             batch_id    = job["id"]
             out_file_id = job.get("output_file_id")
             err_file_id = job.get("error_file_id")
 
-            # first time through: pull fresh metadata to grab file IDs
+            # 1) Grab file IDs if we don't have them yet
             if not out_file_id and not err_file_id:
                 info = self.client.batches.retrieve(batch_id)
-                if info.status != "completed":
-                    print(f"Batch {batch_id} not yet done (status={info.status}).")
+
+                # if the batch as a whole failed or was cancelled…
+                if info.status in ("failed", "cancelled"):
+                    # see if there’s an error file
+                    err_file_id = getattr(info, "error_file_id", None)
+                    # if no error_file_id, fallback to info.errors or raise
+                    if not err_file_id:
+                        msg = info.errors or "Unknown batch failure"
+                        raise RuntimeError(f"Batch {batch_id} failed: {msg}")
+                elif info.status != "completed":
+                    # still in progress/validating
+                    print(f"Batch {batch_id} status={info.status}; try again later.")
                     continue
 
-                # pick up either single or plural field:
-                out_file_id = getattr(info, "output_file_id", None)
-                if not out_file_id:
-                    plural = getattr(info, "output_file_ids", None) or getattr(info, "output_files", None)
-                    if isinstance(plural, list) and plural:
-                        first = plural[0]
-                        out_file_id = getattr(first, "id", None) or first
+                # if it succeeded, collect the output file
+                if info.status == "completed":
+                    out_file_id = getattr(info, "output_file_id", None)
+                    if not out_file_id:
+                        plural = getattr(info, "output_file_ids", None) \
+                                 or getattr(info, "output_files", None)
+                        if isinstance(plural, list) and plural:
+                            first = plural[0]
+                            out_file_id = getattr(first, "id", None) or first
 
-                err_file_id = getattr(info, "error_file_id", None)
-
-                # write them back into our persisted JSON
+                # persist whatever we found
                 job["output_file_id"] = out_file_id
                 job["error_file_id"]  = err_file_id
                 updated = True
 
-            # if there’s an output file, pull and parse successes
+            # 2) Download successes
             if out_file_id:
-                content = self.client.files.content(out_file_id).text
-                for line in content.splitlines():
+                txt = self.client.files.content(out_file_id).text
+                for line in txt.splitlines():
                     entry = json.loads(line)
-                    key, parsed = self._parse_entry(entry)
-                    all_results[key] = parsed
+                    cid, parsed = self._parse_entry(entry)
+                    all_results[cid] = parsed
 
-            # if there’s an error file, pull and parse failures
+            # 3) Download failures
             if err_file_id:
                 err_txt = self.client.files.content(err_file_id).text
 
-        # if we added file IDs, persist them
+        # save back any new file IDs we discovered
         if updated:
             self._save_state(job_name, jobs)
 
+        # dispatch only the successful ones
         if all_results:
             self._dispatch(all_results)
             self._clear_state(job_name)
 
-        return {"results": all_results, "errors": err_txt}
+        return {
+            "results": all_results,
+            "errors":  err_txt
+        }
