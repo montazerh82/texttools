@@ -93,6 +93,7 @@ class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
             endpoint="/v1/chat/completions",
             completion_window="24h"
         )
+        # print("here is the batch job", batch_job)
         return batch_job.to_dict()
 
     def _parse_entry(self, entry: Dict[str, Any]) -> Tuple[str, bool]:

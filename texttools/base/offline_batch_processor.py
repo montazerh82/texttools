@@ -95,7 +95,7 @@ class OfflineBatchProcessor(ABC):
             return "completed"
 
         for job in jobs:
-            status = self.client.batches.retrieve(job["batch_id"]).status
+            status = self.client.batches.retrieve(job["id"]).status
             if status in ("failed", "cancelled"):
                 return status
             if status != "completed":
@@ -161,18 +161,13 @@ class OfflineBatchProcessor(ABC):
             # if there’s an error file, pull and parse failures
             if err_file_id:
                 err_txt = self.client.files.content(err_file_id).text
-                for line in err_txt.splitlines():
-                    entry = json.loads(line)
-                    cid   = entry.get("custom_id")
-                    all_errors[cid] = entry.get("error", entry)
 
         # if we added file IDs, persist them
         if updated:
             self._save_state(job_name, jobs)
 
-        # dispatch successes and optionally clear
         if all_results:
             self._dispatch(all_results)
             self._clear_state(job_name)
 
-        return {"results": all_results, "errors": all_errors}
+        return {"results": all_results, "errors": err_txt}
