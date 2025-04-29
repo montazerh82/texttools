@@ -1,0 +1,1 @@
+from texttools.batch_manager import SimpleBatchManager
