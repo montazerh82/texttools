@@ -58,21 +58,25 @@ class OfflineQuestionDetector(OfflineBatchProcessor, BaseQuestionDetector):
 
     def _build_task(self, text: str, idx: int) -> Dict[str, Any]:
         clean = self.preprocess(text)
+        schema = self._OutputModel.model_json_schema()  
+        response_fmt = {
+            "type": "json_schema",
+            "json_schema": schema ,
+            "strict": True
+        }
+
         return {
             "custom_id": str(idx),
             "method": "POST",
             "url": "/v1/chat/completions",
             "body": {
                 "model": self.model,
-                "temperature": self.temperature,
-                "response_format": self._OutputModel.model_json_schema(),
-                "messages": [
-                    {"role": "system", "content": self.prompt_template},
-                    {"role": "user", "content": clean}
-                ],
+                "prompt": clean,
+                "response_format": response_fmt,
                 **self.client_kwargs
             }
         }
+
 
     def _prepare_upload_file(self, payload: List[str]) -> Path:
         tasks = [self._build_task(text, i) for i, text in enumerate(payload)]
