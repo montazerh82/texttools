@@ -12,4 +12,5 @@ __all__ = [
     "SaveToFileResultHandler",
     "EmbeddingCategorizer",
     "LLMCategorizer",
+    "SimpleBatchManager"
     ]
