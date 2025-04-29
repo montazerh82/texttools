@@ -121,6 +121,7 @@ class OfflineBatchProcessor(ABC):
             return {}
 
         all_results = {}
+        all_errors  = {}
         updated     = False
 
         for job in jobs:
@@ -171,6 +172,11 @@ class OfflineBatchProcessor(ABC):
             # 3) Download failures
             if err_file_id:
                 err_txt = self.client.files.content(err_file_id).text
+                for line in err_txt.splitlines():
+                    entry: dict = json.loads(line)
+                    cid   = entry.get("custom_id")
+                    # either the error object, or the whole entry if it’s flat
+                    all_errors[cid] = entry.get("error", entry)
 
         # save back any new file IDs we discovered
         if updated:
@@ -183,5 +189,5 @@ class OfflineBatchProcessor(ABC):
 
         return {
             "results": all_results,
-            "errors":  err_txt
+            "errors":  all_errors
         }
