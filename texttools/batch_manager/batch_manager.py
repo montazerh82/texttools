@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
 from openai import OpenAI
+from openai.lib._pydantic import to_strict_json_schema
+# from openai.lib._parsing._completions import type_to_response_format_param
 from pydantic import BaseModel
 
 
@@ -47,7 +49,7 @@ class SimpleBatchManager:
             path.unlink()
 
     def _build_task(self, text: str, idx: int) -> Dict[str, Any]:
-        schema = self.output_model.model_json_schema()
+        raw_schema = to_strict_json_schema(self.output_model)
         return {
             "custom_id": str(idx),
             "method": "POST",
@@ -56,12 +58,14 @@ class SimpleBatchManager:
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": self.prompt_template},
-                    {"role": "user", "content": text},
+                    {"role": "user",   "content": text},
                 ],
                 "response_format": {
                     "type": "json_schema",
-                    "json_schema": schema,
-                    "strict": True,
+                    "json_schema": {
+                        "name": self.output_model.__name__, 
+                        "schema": raw_schema
+                    },
                 },
                 **self.client_kwargs,
             },
@@ -77,7 +81,7 @@ class SimpleBatchManager:
 
     def start(self, payload: List[str], job_name: str):
         if self._load_state(job_name):
-            return  # batch already started
+            return 
         path = self._prepare_file(payload)
         upload = self.client.files.create(file=open(path, "rb"), purpose="batch")
         job = self.client.batches.create(
@@ -88,54 +92,52 @@ class SimpleBatchManager:
         self._save_state(job_name, [job])
 
     def check_status(self, job_name: str) -> str:
-        jobs = self._load_state(job_name)
-        if not jobs:
+        job = self._load_state(job_name)[0]
+        if not job:
             return "completed"
-        updated = False
-        for job in jobs:
-            batch = self.client.batches.retrieve(job["id"])
-            job["status"] = batch.status
-            updated = True
-            if batch.status in ("failed", "cancelled"):
-                break
-            if batch.status != "completed":
-                break
-        if updated:
-            self._save_state(job_name, jobs)
-        return jobs[0]["status"]
 
-    def is_ready(self, job_name: str) -> bool:
-        return self.check_status(job_name) == "completed"
+        info = self.client.batches.retrieve(job["id"])
+        job = info.to_dict()
+        self._save_state(job_name, [job])
+        print("HERE is the fucking job", job)
+        return job["status"]
 
     def fetch_results(self, job_name: str) -> Dict[str, Any]:
-        jobs = self._load_state(job_name)
-        if not jobs:
+        job = self._load_state(job_name)[0]
+        if not job:
             return {}
-        job = jobs[0]
         batch_id = job["id"]
 
         info = self.client.batches.retrieve(batch_id)
-        out_file_id = getattr(info, "output_file_id", None)
+        out_file_id = info.output_file_id
         if not out_file_id:
-            plural = getattr(info, "output_file_ids", None) or getattr(info, "output_files", None)
-            if isinstance(plural, list) and plural:
-                out_file_id = getattr(plural[0], "id", None) or plural[0]
+            error_file_id = info.error_file_id
+            if error_file_id:
+                err_content = self.client.files.content(error_file_id).read().decode('utf-8')
+                print("Error file content:", err_content)
+            return {}
 
-        job["output_file_id"] = out_file_id
-        self._save_state(job_name, jobs)
-
+        content = self.client.files.content(out_file_id).read().decode('utf-8')
+        lines = content.splitlines()
         results = {}
-        if out_file_id:
-            txt = self.client.files.content(out_file_id).text
-            for line in txt.splitlines():
-                entry = json.loads(line)
-                cid = entry["custom_id"]
-                parsed = self.output_model.model_validate(entry["response"]).model_dump()
-                results[cid] = parsed
+        for line in lines:
+            result = json.loads(line)
+            custom_id = result['custom_id']
+            if result['response']['status_code'] == 200:
+                content = result['response']['body']['choices'][0]['message']['content']
+                try:
+                    parsed_content = json.loads(content)
+                    model_instance = self.output_model(**parsed_content)
+                    results[custom_id] = model_instance
+                except json.JSONDecodeError:
+                    results[custom_id] = {'error': 'Failed to parse content as JSON'}
+                except Exception as e:
+                    results[custom_id] = {'error': str(e)}
+            else:
+                error_message = result['response']['body'].get('error', {}).get('message', 'Unknown error')
+                results[custom_id] = {'error': error_message}
 
-        if results:
-            for handler in self.handlers:
-                handler.handle(results)
-            self._clear_state(job_name)
-
-        return {"results": results}
+        for handler in self.handlers:
+            handler.handle(results)
+        self._clear_state(job_name)
+        return results

@@ -13,7 +13,7 @@ processor = SimpleBatchManager(
     client=client,
     model="gpt-4o-mini",
     prompt_template="You are a binary classifier. Answer only with `true` or `false`.",
-    output_model=OutputSchema,
+    output_model=IsQuestion,
 )
 
 inputs = [

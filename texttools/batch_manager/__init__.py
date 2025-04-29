@@ -1,1 +1,1 @@
-from texttools.batch_manager import SimpleBatchManager
+from .batch_manager import SimpleBatchManager
