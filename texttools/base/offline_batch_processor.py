@@ -66,12 +66,24 @@ class OfflineBatchProcessor(ABC):
 
     def start(self, payload: Any, job_name: str):
         """
-        Starts a new batch job and saves its state to a local JSON file.
+        Starts a new batch job **only if** there isn't one in-flight already,
+        and saves the full batch metadata to JSON.
         """
+        # if state already exists, assume it has the full batch dict:
+        existing = self._load_state(job_name)
+        if existing:
+            print(f"Resuming existing batch for '{job_name}' → batch_id={existing[0]['id']!r}")
+            return
+
         file_path = self._prepare_upload_file(payload)
-        batch_id = self._submit_batch(file_path)
-        jobs = [{"batch_id": batch_id, "output_file_id": None}]
-        self._save_state(job_name, jobs)
+        batch_meta : dict = self._submit_batch(file_path)
+
+        # batch_meta.update({
+        #     "output_file_id": None,
+        #     "error_file_id": None,
+        # })
+        self._save_state(job_name, [batch_meta])
+        print(f"Started new batch: {batch_meta['id']!r}")
 
     def check_status(self, job_name: str) -> str:
         """
@@ -98,57 +110,69 @@ class OfflineBatchProcessor(ABC):
 
     def fetch_results(self, job_name: str) -> Dict[str, Any]:
         """
-        Fetches results, dispatches to handlers, and clears state.
-        Will load existing output_file_id from state if present.
+        Loads the saved batch metadata, refreshes status,
+        stores any new file_ids back to disk, and finally
+        downloads results/errors.
         """
         jobs = self._load_state(job_name)
         if not jobs:
             print(f"No batch jobs found for '{job_name}'.")
             return {}
 
-        results = {}
+        all_results = {}
+        all_errors = {}
         updated = False
 
         for job in jobs:
-            batch_id = job["batch_id"]
-            file_id = job.get("output_file_id")
+            batch_id    = job["id"]
+            out_file_id = job.get("output_file_id")
+            err_file_id = job.get("error_file_id")
 
-            # if we haven’t yet stored an output_file_id, retrieve it
-            if not file_id:
+            # first time through: pull fresh metadata to grab file IDs
+            if not out_file_id and not err_file_id:
                 info = self.client.batches.retrieve(batch_id)
                 if info.status != "completed":
-                    print(f"Batch {batch_id} status: {info.status}")
+                    print(f"Batch {batch_id} not yet done (status={info.status}).")
                     continue
 
-                # support both old and new SDK fields
-                file_id = getattr(info, "output_file_id", None)
-                if not file_id:
+                # pick up either single or plural field:
+                out_file_id = getattr(info, "output_file_id", None)
+                if not out_file_id:
                     plural = getattr(info, "output_file_ids", None) or getattr(info, "output_files", None)
                     if isinstance(plural, list) and plural:
                         first = plural[0]
-                        file_id = getattr(first, "id", None) or first
+                        out_file_id = getattr(first, "id", None) or first
 
-                if not file_id:
-                    print(f"No output file for batch {batch_id}")
-                    continue
+                err_file_id = getattr(info, "error_file_id", None)
 
-                # persist it
-                job["output_file_id"] = file_id
+                # write them back into our persisted JSON
+                job["output_file_id"] = out_file_id
+                job["error_file_id"]  = err_file_id
                 updated = True
 
-            # now we have a file_id, fetch content
-            content = self.client.files.content(file_id).text
-            for line in content.splitlines():
-                entry = json.loads(line)
-                key, parsed = self._parse_entry(entry)
-                results[key] = parsed
+            # if there’s an output file, pull and parse successes
+            if out_file_id:
+                content = self.client.files.content(out_file_id).text
+                for line in content.splitlines():
+                    entry = json.loads(line)
+                    key, parsed = self._parse_entry(entry)
+                    all_results[key] = parsed
 
-        # if we wrote back new file_ids, save state
+            # if there’s an error file, pull and parse failures
+            if err_file_id:
+                err_txt = self.client.files.content(err_file_id).text
+                for line in err_txt.splitlines():
+                    entry = json.loads(line)
+                    cid   = entry.get("custom_id")
+                    all_errors[cid] = entry.get("error", entry)
+
+        # if we added file IDs, persist them
         if updated:
             self._save_state(job_name, jobs)
 
-        if results:
-            self._dispatch(results)
+        # dispatch successes and optionally clear
+        if all_results:
+            self._dispatch(all_results)
             self._clear_state(job_name)
 
-        return results
+        return {"results": all_results, "errors": all_errors}
