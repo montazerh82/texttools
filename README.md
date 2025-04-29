@@ -4,7 +4,9 @@ how to use it?
 
 just clone the Fn repo and install it like this
 
-`pip install .`
+```bash
+pip install -U  git+https://github.com/HadithAi/texttools
+```
 
 ---
 
