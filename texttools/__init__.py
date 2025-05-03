@@ -3,6 +3,8 @@ from texttools.handlers import NoOpResultHandler, PrintResultHandler, ResultHand
 from texttools.categorizer.encoder_model.encoder_vectorizer import EmbeddingCategorizer
 from texttools.categorizer.llm.openai_categorizer import LLMCategorizer
 from texttools.batch_manager import SimpleBatchManager
+from texttools.summarizer import LLMSummarizer
+
 
 __all__ = [
     "LLMQuestionDetector",
@@ -12,5 +14,6 @@ __all__ = [
     "SaveToFileResultHandler",
     "EmbeddingCategorizer",
     "LLMCategorizer",
-    "SimpleBatchManager"
+    "SimpleBatchManager",
+    "LLMSummarizer"
     ]

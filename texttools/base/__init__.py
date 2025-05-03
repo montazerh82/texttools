@@ -1,2 +1,3 @@
-from texttools.base.base_categorizer import *
-from texttools.base.base_question_detector import *
+from texttools.base.base_categorizer import BaseCategorizer
+from texttools.base.base_question_detector import BaseQuestionDetector
+from texttools.base.base_summarizer import BaseSummarizer

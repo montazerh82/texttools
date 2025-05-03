@@ -10,7 +10,7 @@ class LLMQuestionDetector(BaseQuestionDetector):
     Usage:
         ```python
         from openai import OpenAI
-        from your_module import LLMQuestionDetector
+        from texttools import LLMQuestionDetector
 
         # Instantiate an OpenAI client (ensure you ve set OPENAI_API_KEY)
         client = OpenAI()
