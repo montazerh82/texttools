@@ -18,6 +18,7 @@ class SimpleBatchManager:
         prompt_template: str,
         handlers: Optional[List[Any]] = None,
         state_dir: Path = Path(".batch_jobs"),
+        custom_json_schema_obj_str: Optional[dict] = None,
         **client_kwargs: Any,
     ):
         self.client = client
@@ -27,12 +28,17 @@ class SimpleBatchManager:
         self.handlers = handlers or []
         self.state_dir = state_dir
         self.state_dir.mkdir(parents=True, exist_ok=True)
+        self.custom_json_schema_obj_str = custom_json_schema_obj_str
         self.client_kwargs = client_kwargs
 
+
+        if self.custom_json_schema_obj_str is not dict:
+            raise ValueError(
+                    "schema should be a dict")
     def _state_file(self, job_name: str) -> Path:
         return self.state_dir / f"{job_name}.json"
 
-    def _load_state(self, job_name: str) -> List[Dict[str, Any]]:
+    def _load_state(self, job_name: str) -> List[Dict[str, Any] ]:
         path = self._state_file(job_name)
         if path.exists():
             with open(path, "r", encoding="utf-8") as f:
@@ -49,7 +55,29 @@ class SimpleBatchManager:
             path.unlink()
 
     def _build_task(self, text: str, idx: int) -> Dict[str, Any]:
-        raw_schema = to_strict_json_schema(self.output_model)
+        response_format_config: Dict[str, Any]
+        if self.custom_json_schema_obj_str:
+            # try:
+                # parsed_custom_schema = json.loads(self.custom_json_schema_obj_str)
+                response_format_config = {
+                    "type": "json_schema",
+                    "json_schema": self.custom_json_schema_obj_str
+                }
+            # except json.JSONDecodeError as e:
+            #     raise ValueError(
+            #         "Failed to parse custom_json_schema_obj_str. "
+            #         "Please ensure it's a valid JSON string."
+            #     ) from e
+        else:
+            raw_schema = to_strict_json_schema(self.output_model)
+            response_format_config = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": self.output_model.__name__,
+                    "schema": raw_schema
+                }
+            }
+
         return {
             "custom_id": str(idx),
             "method": "POST",
@@ -60,13 +88,7 @@ class SimpleBatchManager:
                     {"role": "system", "content": self.prompt_template},
                     {"role": "user",   "content": text},
                 ],
-                "response_format": {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": self.output_model.__name__, 
-                        "schema": raw_schema
-                    },
-                },
+                "response_format": response_format_config,
                 **self.client_kwargs,
             },
         }
